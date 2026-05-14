@@ -1,4 +1,11 @@
-# Securities Trade Reconciliation Pipeline
+# Trade Reconciliation Pipeline
+
+[![dbt CI](https://github.com/Meuracha/Trade-Reconciliation-Pipeline/actions/workflows/dbt_ci.yml/badge.svg)](https://github.com/Meuracha/Trade-Reconciliation-Pipeline/actions/workflows/dbt_ci.yml)
+[![Docker Build](https://github.com/Meuracha/Trade-Reconciliation-Pipeline/actions/workflows/docker_build.yml/badge.svg)](https://github.com/Meuracha/Trade-Reconciliation-Pipeline/actions/workflows/docker_build.yml)
+[![dbt Docs](https://img.shields.io/badge/dbt-docs-FF694B)](https://meuracha.github.io/Trade-Reconciliation-Pipeline)
+[![Python](https://img.shields.io/badge/python-3.11-blue)](https://www.python.org/)
+[![dbt](https://img.shields.io/badge/dbt-1.8-orange)](https://www.getdbt.com/)
+[![Airflow](https://img.shields.io/badge/Airflow-2.9-017CEE)](https://airflow.apache.org/)
 
 End-to-end data engineering pipeline that detects and tracks reconciliation breaks between broker-side and exchange-side trade records — simulating real-world operations at a securities firm.
 
@@ -35,6 +42,7 @@ End-to-end data engineering pipeline that detects and tracks reconciliation brea
 trade-reconciliation/
 ├── .github/workflows/
 │   ├── dbt_ci.yml            # dbt run + test + docs on push to main
+│   ├── dbt_docs.yml          # deploy dbt docs to GitHub Pages
 │   ├── pr_check.yml          # dbt compile + sqlfluff + ruff on PR
 │   └── docker_build.yml      # Docker build check on Dockerfile changes
 ├── airflow/
@@ -45,7 +53,7 @@ trade-reconciliation/
 ├── dashboard/
 │   ├── Dockerfile
 │   ├── requirements.txt
-│   └── app.py                # Streamlit 3-page dashboard
+│   └── app.py                # Streamlit 4-page dashboard
 ├── dbt/
 │   ├── macros/
 │   │   └── classify_priority.sql
@@ -55,6 +63,9 @@ trade-reconciliation/
 │   │   ├── mart/             # summary, break report, SLA
 │   │   └── exposures.yml
 │   └── tests/                # singular tests
+├── docs/
+│   ├── images/               # architecture + data flow SVG
+│   └── screenshots/          # dashboard screenshots
 ├── postgres/
 │   └── init.sql              # auto-creates tables on first start
 ├── simulator/
@@ -100,6 +111,25 @@ trade-reconciliation/
 | Daily Summary | Match rate %, KPI cards, breaks by priority and type |
 | Break Report | Filterable break table with CSV export |
 | Resolution Tracker | OPEN/IN_PROGRESS/RESOLVED tracking + SLA chart |
+| Break Management | Assign, resolve, escalate breaks with SLA countdown |
+
+### Daily Summary
+![Daily Summary](docs/screenshots/screenshot_daily_summary.png)
+![Daily Summary Pie Chart](docs/screenshots/screenshot_daily_summary_1.png)
+
+### Break Report
+![Break Report](docs/screenshots/screenshot_break_report.png)
+
+### Resolution Tracker
+![Resolution Tracker](docs/screenshots/screenshot_resolution_tracker.png)
+
+### Break Management
+![Break Management](docs/screenshots/screenshot_break_management.png)
+![Break Management Quick Action](docs/screenshots/screenshot_break_management_1.png)
+![Break Management Drop](docs/screenshots/screenshot_break_management_2.png)
+
+### Airflow DAG — All tasks green ✅
+![Airflow DAG](docs/screenshots/screenshot_airflow_dag.png)
 
 ---
 
@@ -136,6 +166,7 @@ make pipeline
 ```
 Streamlit  → http://localhost:8501
 Airflow    → http://localhost:8080  (admin / admin)
+dbt Docs   → https://meuracha.github.io/Trade-Reconciliation-Pipeline
 ```
 
 ### 5. View dbt docs
@@ -152,6 +183,7 @@ make dbt-docs
 ```bash
 make up           # Start all services
 make down         # Stop all services
+make reset        # Reset all volumes and restart fresh
 make simulate     # Run simulator once
 make dbt-run      # Run all dbt models
 make dbt-test     # Run all dbt tests
@@ -169,6 +201,7 @@ make clean        # Remove dbt artifacts
 | Workflow | Trigger | What it does |
 |----------|---------|--------------|
 | `dbt_ci.yml` | Push to main | Full dbt run + test + docs |
+| `dbt_docs.yml` | Push to main (dbt changes) | Deploy dbt docs to GitHub Pages |
 | `pr_check.yml` | Pull Request | dbt compile + sqlfluff + ruff |
 | `docker_build.yml` | Dockerfile changes | Build all images |
 
