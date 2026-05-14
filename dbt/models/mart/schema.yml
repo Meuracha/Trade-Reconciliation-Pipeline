@@ -1,0 +1,75 @@
+version: 2
+
+models:
+  - name: mart_reconciliation_summary
+    description: "Daily reconciliation KPI summary — match rate, total trades, break count, and status"
+    config:
+      tags: ["mart", "daily", "kpi"]
+    columns:
+      - name: summary_date
+        description: "Date of reconciliation run"
+        tests: [not_null]
+      - name: total_trades
+        description: "Total number of trades processed"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+      - name: matched_count
+        description: "Number of trades that matched on both sides"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+      - name: total_breaks
+        description: "Total number of reconciliation breaks"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+      - name: match_rate
+        description: "Percentage of trades that matched — matched_count / total_trades * 100"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN 0 AND 100"
+      - name: status
+        description: "GOOD (>=99%), WARNING (>=95%), CRITICAL (<95%)"
+        tests:
+          - not_null
+          - accepted_values:
+              config:
+                severity: error
+              values: ["GOOD", "WARNING", "CRITICAL"]
+
+  - name: mart_break_report
+    description: "Full break report combining mismatched and missing trades — ordered by priority for Operations team"
+    config:
+      tags: ["mart", "daily", "operations"]
+    columns:
+      - name: trade_id
+        description: "Unique trade identifier"
+        tests: [not_null]
+      - name: break_type
+        description: "Type of reconciliation break"
+        tests:
+          - not_null
+          - accepted_values:
+              config:
+                severity: error
+              values:
+                - PRICE_MISMATCH
+                - QTY_MISMATCH
+                - PRICE_AND_QTY_MISMATCH
+                - MISSING_FROM_EXCHANGE
+                - MISSING_FROM_BROKER
+      - name: priority
+        description: "Break priority — HIGH requires immediate action, LOW can be batched"
+        tests:
+          - not_null
+          - accepted_values:
+              config:
+                severity: error
+              values: ["HIGH", "MEDIUM", "LOW"]
+      - name: break_category
+        description: "PRICE/QTY for value differences, MISSING for one-sided trades"

@@ -1,0 +1,30 @@
+name: Docker Build Check
+
+on:
+  push:
+    paths:
+      - "simulator/Dockerfile"
+      - "dashboard/Dockerfile"
+      - "airflow/Dockerfile"
+      - "simulator/requirements.txt"
+      - "dashboard/requirements.txt"
+      - "airflow/requirements.txt"
+
+jobs:
+  build:
+    name: Build all Dockerfiles
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service: [simulator, dashboard, airflow]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.service }}
+        run: |
+          docker build ./${{ matrix.service }} \
+            --tag trade-recon/${{ matrix.service }}:ci \
+            --no-cache

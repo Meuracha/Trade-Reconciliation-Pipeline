@@ -1,0 +1,170 @@
+version: "3.9"
+
+x-airflow-common: &airflow-common
+  build:
+    context: ./airflow
+    dockerfile: Dockerfile
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@postgres-airflow:5432/${AIRFLOW_DB_NAME}
+    AIRFLOW__CORE__FERNET_KEY: ""
+    AIRFLOW__WEBSERVER__SECRET_KEY: "trade-recon-secret-key-2024"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: "Asia/Bangkok"
+    # App DB connection (for DAGs to read/write trade data)
+    APP_DB_CONN: postgresql+psycopg2://${APP_DB_USER}:${APP_DB_PASSWORD}@postgres-app:5432/${APP_DB_NAME}
+    # Slack alert
+    SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./simulator/generate_trades.py:/opt/airflow/dags/generate_trades.py
+    - ./dbt:/opt/airflow/dbt
+    - airflow-logs:/opt/airflow/logs
+  depends_on:
+    postgres-airflow:
+      condition: service_healthy
+    postgres-app:
+      condition: service_healthy
+  networks:
+    - recon-network
+
+services:
+
+  # ─────────────────────────────────────────
+  # PostgreSQL — Airflow metadata DB
+  # ─────────────────────────────────────────
+  postgres-airflow:
+    image: postgres:15
+    container_name: postgres-airflow
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME}
+    volumes:
+      - postgres-airflow-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${AIRFLOW_DB_USER}"]
+      interval: 10s
+      retries: 5
+    networks:
+      - recon-network
+
+  # ─────────────────────────────────────────
+  # PostgreSQL — Application DB (trade data)
+  # ─────────────────────────────────────────
+  postgres-app:
+    image: postgres:15
+    container_name: postgres-app
+    environment:
+      POSTGRES_USER: ${APP_DB_USER}
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD}
+      POSTGRES_DB: ${APP_DB_NAME}
+    ports:
+      - "5432:5432"           # expose for dbt + local dev
+    volumes:
+      - postgres-app-data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${APP_DB_USER}"]
+      interval: 10s
+      retries: 5
+    networks:
+      - recon-network
+
+  # ─────────────────────────────────────────
+  # Airflow — init (run once)
+  # ─────────────────────────────────────────
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow-init
+    command: >
+      bash -c "
+        airflow db migrate &&
+        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com
+      "
+    restart: "no"
+
+  # ─────────────────────────────────────────
+  # Airflow — Webserver
+  # ─────────────────────────────────────────
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow-webserver
+    command: webserver
+    ports:
+      - "8080:8080"
+    restart: always
+
+  # ─────────────────────────────────────────
+  # Airflow — Scheduler
+  # ─────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow-scheduler
+    command: scheduler
+    restart: always
+
+  # ─────────────────────────────────────────
+  # Data Simulator
+  # ─────────────────────────────────────────
+  simulator:
+    build:
+      context: ./simulator
+      dockerfile: Dockerfile
+    container_name: simulator
+    environment:
+      APP_DB_HOST: postgres-app
+      APP_DB_PORT: 5432
+      APP_DB_NAME: ${APP_DB_NAME}
+      APP_DB_USER: ${APP_DB_USER}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      ERROR_RATE: ${ERROR_RATE:-0.05}
+      TRADES_PER_RUN: ${TRADES_PER_RUN:-1000}
+    depends_on:
+      postgres-app:
+        condition: service_healthy
+    networks:
+      - recon-network
+    # Run once on startup (Airflow will trigger it on schedule)
+    restart: "no"
+
+  # ─────────────────────────────────────────
+  # Streamlit Dashboard
+  # ─────────────────────────────────────────
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: dashboard
+    environment:
+      APP_DB_HOST: postgres-app
+      APP_DB_PORT: 5432
+      APP_DB_NAME: ${APP_DB_NAME}
+      APP_DB_USER: ${APP_DB_USER}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+    ports:
+      - "8501:8501"
+    depends_on:
+      postgres-app:
+        condition: service_healthy
+    networks:
+      - recon-network
+    restart: always
+
+# ─────────────────────────────────────────
+# Volumes
+# ─────────────────────────────────────────
+volumes:
+  postgres-airflow-data:
+  postgres-app-data:
+  airflow-logs:
+
+# ─────────────────────────────────────────
+# Networks
+# ─────────────────────────────────────────
+networks:
+  recon-network:
+    driver: bridge

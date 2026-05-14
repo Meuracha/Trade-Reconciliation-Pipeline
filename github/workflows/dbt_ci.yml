@@ -1,0 +1,118 @@
+name: dbt CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dbt/**"
+      - ".github/workflows/dbt_ci.yml"
+
+jobs:
+  dbt-ci:
+    name: dbt run + test + docs
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: ${{ secrets.APP_DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.APP_DB_NAME }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dbt
+        run: pip install dbt-core dbt-postgres
+
+      - name: Init database schema
+        env:
+          PGPASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+        run: |
+          psql -h localhost -U ${{ secrets.APP_DB_USER }} -d ${{ secrets.APP_DB_NAME }} \
+            -f postgres/init.sql
+
+      - name: dbt deps
+        working-directory: dbt
+        env:
+          APP_DB_HOST: localhost
+          APP_DB_PORT: 5432
+          APP_DB_NAME: ${{ secrets.APP_DB_NAME }}
+          APP_DB_USER: ${{ secrets.APP_DB_USER }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+        run: dbt deps
+
+      - name: dbt debug
+        working-directory: dbt
+        env:
+          APP_DB_HOST: localhost
+          APP_DB_PORT: 5432
+          APP_DB_NAME: ${{ secrets.APP_DB_NAME }}
+          APP_DB_USER: ${{ secrets.APP_DB_USER }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+        run: dbt debug
+
+      - name: Seed simulator data (for testing)
+        working-directory: simulator
+        env:
+          APP_DB_HOST: localhost
+          APP_DB_PORT: 5432
+          APP_DB_NAME: ${{ secrets.APP_DB_NAME }}
+          APP_DB_USER: ${{ secrets.APP_DB_USER }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+          ERROR_RATE: "0.05"
+          TRADES_PER_RUN: "200"
+        run: |
+          pip install psycopg2-binary
+          python generate_trades.py
+
+      - name: dbt run
+        working-directory: dbt
+        env:
+          APP_DB_HOST: localhost
+          APP_DB_PORT: 5432
+          APP_DB_NAME: ${{ secrets.APP_DB_NAME }}
+          APP_DB_USER: ${{ secrets.APP_DB_USER }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+        run: dbt run
+
+      - name: dbt test
+        working-directory: dbt
+        env:
+          APP_DB_HOST: localhost
+          APP_DB_PORT: 5432
+          APP_DB_NAME: ${{ secrets.APP_DB_NAME }}
+          APP_DB_USER: ${{ secrets.APP_DB_USER }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+        run: dbt test
+
+      - name: dbt docs generate
+        working-directory: dbt
+        env:
+          APP_DB_HOST: localhost
+          APP_DB_PORT: 5432
+          APP_DB_NAME: ${{ secrets.APP_DB_NAME }}
+          APP_DB_USER: ${{ secrets.APP_DB_USER }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+        run: dbt docs generate
+
+      - name: Upload dbt docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-docs
+          path: dbt/target/
+          retention-days: 7

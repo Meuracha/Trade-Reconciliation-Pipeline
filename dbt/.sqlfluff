@@ -1,0 +1,25 @@
+[sqlfluff]
+dialect = postgres
+templater = dbt
+sql_file_exts = .sql
+
+# Max line length
+max_line_length = 120
+
+# Rules to exclude
+exclude_rules = L016, L034
+
+[sqlfluff:templater:dbt]
+project_dir = .
+
+[sqlfluff:rules:L010]
+# Keywords uppercase
+capitalisation_policy = upper
+
+[sqlfluff:rules:L014]
+# Column aliases lowercase
+capitalisation_policy = lower
+
+[sqlfluff:rules:L030]
+# Function names uppercase
+capitalisation_policy = upper

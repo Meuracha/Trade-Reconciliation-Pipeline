@@ -1,0 +1,24 @@
+version: 2
+
+exposures:
+  - name: reconciliation_dashboard
+    type: dashboard
+    description: "Streamlit dashboard for Operations team — shows daily match rate, break report, and resolution SLA tracking"
+    depends_on:
+      - ref('mart_reconciliation_summary')
+      - ref('mart_break_report')
+    owner:
+      name: Uracha Rittikulsittichai
+      email: uracha.rit@gmail.com
+    tags: ["dashboard", "operations"]
+
+  - name: slack_alert
+    type: application
+    description: "Slack alert sent by Airflow DAG when HIGH priority breaks exceed threshold"
+    depends_on:
+      - ref('mart_reconciliation_summary')
+      - ref('mart_break_report')
+    owner:
+      name: Uracha Rittikulsittichai
+      email: uracha.rit@gmail.com
+    tags: ["alert", "operations"]

@@ -1,0 +1,128 @@
+<svg width="680" height="740" viewBox="0 0 680 740" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Trade reconciliation pipeline architecture</title>
+  <desc>Architecture diagram showing data flow from simulator through PostgreSQL, Airflow, dbt, to Streamlit dashboard and Slack alerts</desc>
+
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#6B7280" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="arr-teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#0F6E56" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="arr-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#185FA5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- ── Row label: Data sources ── -->
+  <text x="340" y="26" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#9CA3AF" letter-spacing="0.08em">DATA SOURCES</text>
+
+  <!-- Broker simulator -->
+  <rect x="60" y="36" width="240" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1"/>
+  <text x="180" y="58" text-anchor="middle" font-family="ui-sans-serif,sans-serif" font-size="13" font-weight="600" fill="#085041">Simulator · broker side</text>
+  <text x="180" y="76" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#0F6E56">Python · 1,000 trades/run</text>
+
+  <!-- Exchange simulator -->
+  <rect x="380" y="36" width="240" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1"/>
+  <text x="500" y="58" text-anchor="middle" font-family="ui-sans-serif,sans-serif" font-size="13" font-weight="600" fill="#085041">Simulator · exchange side</text>
+  <text x="500" y="76" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#0F6E56">5% errors injected</text>
+
+  <!-- Arrows down -->
+  <line x1="180" y1="92" x2="180" y2="138" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="500" y1="92" x2="500" y2="138" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── Row label: Storage ── -->
+  <text x="340" y="130" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#9CA3AF" letter-spacing="0.08em">STORAGE</text>
+
+  <!-- Broker DB -->
+  <rect x="60" y="142" width="240" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1"/>
+  <text x="180" y="164" text-anchor="middle" font-family="ui-sans-serif,sans-serif" font-size="13" font-weight="600" fill="#2C2C2A">PostgreSQL</text>
+  <text x="180" y="182" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#5F5E5A">raw_broker_trades</text>
+
+  <!-- Exchange DB -->
+  <rect x="380" y="142" width="240" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1"/>
+  <text x="500" y="164" text-anchor="middle" font-family="ui-sans-serif,sans-serif" font-size="13" font-weight="600" fill="#2C2C2A">PostgreSQL</text>
+  <text x="500" y="182" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#5F5E5A">raw_exchange_trades</text>
+
+  <!-- Converge arrows to Airflow -->
+  <line x1="180" y1="198" x2="180" y2="228" stroke="#6B7280" stroke-width="1.5"/>
+  <line x1="500" y1="198" x2="500" y2="228" stroke="#6B7280" stroke-width="1.5"/>
+  <line x1="180" y1="228" x2="320" y2="250" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="500" y1="228" x2="362" y2="250" stroke="#6B7280" stroke-width="1.5"/>
+
+  <!-- ── Row label: Orchestration ── -->
+  <text x="340" y="244" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#9CA3AF" letter-spacing="0.08em">ORCHESTRATION</text>
+
+  <!-- Airflow -->
+  <rect x="130" y="256" width="420" height="68" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="1"/>
+  <text x="340" y="278" text-anchor="middle" font-family="ui-sans-serif,sans-serif" font-size="13" font-weight="600" fill="#26215C">Airflow DAG · Mon–Fri 16:30</text>
+  <text x="340" y="296" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#534AB7">deps → simulate → freshness → run → test → docs → alert</text>
+  <text x="340" y="314" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#7F77DD">LocalExecutor · retry: 1 · delay: 5 min</text>
+
+  <!-- Arrow down to dbt -->
+  <line x1="340" y1="324" x2="340" y2="364" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── Row label: Transformation ── -->
+  <text x="340" y="358" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#9CA3AF" letter-spacing="0.08em">TRANSFORMATION</text>
+
+  <!-- Staging -->
+  <rect x="40" y="368" width="175" height="72" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1"/>
+  <text x="128" y="390" text-anchor="middle" font-family="ui-sans-serif,sans-serif" font-size="13" font-weight="600" fill="#042C53">Staging</text>
+  <text x="128" y="408" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#185FA5">stg_broker_trades</text>
+  <text x="128" y="424" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#185FA5">stg_exchange_trades</text>
+
+  <!-- Intermediate -->
+  <rect x="252" y="368" width="175" height="72" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1"/>
+  <text x="340" y="390" text-anchor="middle" font-family="ui-sans-serif,sans-serif" font-size="13" font-weight="600" fill="#042C53">Intermediate</text>
+  <text x="340" y="408" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#185FA5">int_matched_trades</text>
+  <text x="340" y="424" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#185FA5">int_mismatched · int_missing</text>
+
+  <!-- Mart -->
+  <rect x="464" y="368" width="175" height="72" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1"/>
+  <text x="552" y="390" text-anchor="middle" font-family="ui-sans-serif,sans-serif" font-size="13" font-weight="600" fill="#042C53">Mart</text>
+  <text x="552" y="408" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#185FA5">mart_recon_summary</text>
+  <text x="552" y="424" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#185FA5">mart_break_report · SLA</text>
+
+  <!-- Arrows between dbt layers -->
+  <line x1="215" y1="404" x2="250" y2="404" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+  <line x1="427" y1="404" x2="462" y2="404" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+
+  <!-- Arrows down to outputs -->
+  <line x1="340" y1="440" x2="340" y2="484" stroke="#6B7280" stroke-width="1.5"/>
+  <line x1="552" y1="440" x2="552" y2="484" stroke="#6B7280" stroke-width="1.5"/>
+  <path d="M340 484 L180 484 L180 506" fill="none" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M340 484 L340 506" fill="none" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M552 484 L500 484 L500 506" fill="none" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── Row label: Outputs ── -->
+  <text x="340" y="500" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#9CA3AF" letter-spacing="0.08em">OUTPUTS</text>
+
+  <!-- Streamlit -->
+  <rect x="60" y="510" width="260" height="68" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="1"/>
+  <text x="190" y="533" text-anchor="middle" font-family="ui-sans-serif,sans-serif" font-size="13" font-weight="600" fill="#4A1B0C">Streamlit Dashboard</text>
+  <text x="190" y="551" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#993C1D">Daily summary · Break report</text>
+  <text x="190" y="567" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#993C1D">Resolution tracker · :8501</text>
+
+  <!-- Slack -->
+  <rect x="360" y="510" width="260" height="68" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1"/>
+  <text x="490" y="533" text-anchor="middle" font-family="ui-sans-serif,sans-serif" font-size="13" font-weight="600" fill="#412402">Slack Alert</text>
+  <text x="490" y="551" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#854F0B">HIGH breaks &gt; threshold</text>
+  <text x="490" y="567" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#854F0B">match rate · break counts</text>
+
+  <!-- ── Row label: CI/CD ── -->
+  <line x1="340" y1="578" x2="340" y2="614" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="340" y="608" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#9CA3AF" letter-spacing="0.08em">CI/CD</text>
+
+  <!-- CI boxes -->
+  <rect x="40" y="622" width="180" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1"/>
+  <text x="130" y="644" text-anchor="middle" font-family="ui-sans-serif,sans-serif" font-size="12" font-weight="600" fill="#2C2C2A">dbt_ci.yml</text>
+  <text x="130" y="662" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#5F5E5A">push to main · full run</text>
+
+  <rect x="250" y="622" width="180" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1"/>
+  <text x="340" y="644" text-anchor="middle" font-family="ui-sans-serif,sans-serif" font-size="12" font-weight="600" fill="#2C2C2A">pr_check.yml</text>
+  <text x="340" y="662" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#5F5E5A">pull request · lint</text>
+
+  <rect x="460" y="622" width="180" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1"/>
+  <text x="550" y="644" text-anchor="middle" font-family="ui-sans-serif,sans-serif" font-size="12" font-weight="600" fill="#2C2C2A">docker_build.yml</text>
+  <text x="550" y="662" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#5F5E5A">Dockerfile changes</text>
+</svg>

@@ -1,0 +1,76 @@
+version: 2
+
+models:
+  - name: stg_broker_trades
+    description: "Cleaned and standardised broker trades"
+    config:
+      tags: ["staging", "daily"]
+    columns:
+      - name: trade_id
+        description: "Unique trade identifier"
+        tests: [unique, not_null]
+      - name: symbol
+        description: "Standardised SET stock symbol"
+        tests:
+          - not_null
+          - accepted_values:
+              config:
+                severity: error
+              values: ["KBANK", "PTT", "AOT", "CPALL", "SCB"]
+      - name: side
+        description: "Trade direction"
+        tests:
+          - not_null
+          - accepted_values:
+              config:
+                severity: error
+              values: ["BUY", "SELL"]
+      - name: quantity
+        description: "Number of shares traded"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "> 0"
+      - name: price
+        description: "Trade price in THB"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "> 0"
+
+  - name: stg_exchange_trades
+    description: "Cleaned and standardised exchange trades"
+    config:
+      tags: ["staging", "daily"]
+    columns:
+      - name: trade_id
+        description: "Unique trade identifier"
+        tests: [unique, not_null]
+      - name: symbol
+        description: "Standardised SET stock symbol"
+        tests:
+          - not_null
+          - accepted_values:
+              config:
+                severity: error
+              values: ["KBANK", "PTT", "AOT", "CPALL", "SCB"]
+      - name: side
+        description: "Trade direction"
+        tests:
+          - not_null
+          - accepted_values:
+              config:
+                severity: error
+              values: ["BUY", "SELL"]
+      - name: quantity
+        description: "Number of shares traded"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "> 0"
+      - name: price
+        description: "Trade price in THB"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "> 0"

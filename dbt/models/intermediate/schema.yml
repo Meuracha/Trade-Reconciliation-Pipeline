@@ -1,0 +1,90 @@
+version: 2
+
+models:
+  - name: int_matched_trades
+    description: "Trades that exist on both broker and exchange sides with matching price and quantity"
+    config:
+      tags: ["intermediate", "daily"]
+    columns:
+      - name: trade_id
+        description: "Unique trade identifier"
+        tests: [not_null]
+      - name: symbol
+        description: "SET-listed stock symbol"
+        tests: [not_null]
+      - name: side
+        description: "BUY or SELL"
+        tests: [not_null]
+      - name: quantity
+        description: "Number of shares traded"
+        tests: [not_null]
+      - name: price
+        description: "Trade price in THB"
+        tests: [not_null]
+      - name: status
+        description: "Always MATCHED for this model"
+        tests:
+          - accepted_values:
+              config:
+                severity: error
+              values: ["MATCHED"]
+
+  - name: int_mismatched_trades
+    description: "Trades that exist on both sides but have price or quantity differences"
+    config:
+      tags: ["intermediate", "daily"]
+    columns:
+      - name: trade_id
+        description: "Unique trade identifier"
+        tests: [not_null]
+      - name: broker_price
+        description: "Price recorded on broker side"
+        tests: [not_null]
+      - name: exchange_price
+        description: "Price recorded on exchange side"
+        tests: [not_null]
+      - name: price_diff
+        description: "Absolute difference between broker and exchange price"
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+      - name: break_type
+        description: "PRICE_MISMATCH, QTY_MISMATCH, or PRICE_AND_QTY_MISMATCH"
+        tests:
+          - not_null
+          - accepted_values:
+              config:
+                severity: error
+              values: ["PRICE_MISMATCH", "QTY_MISMATCH", "PRICE_AND_QTY_MISMATCH"]
+      - name: priority
+        description: "HIGH (diff > 1.00), MEDIUM (diff > 0.10), LOW (otherwise)"
+        tests:
+          - not_null
+          - accepted_values:
+              config:
+                severity: error
+              values: ["HIGH", "MEDIUM", "LOW"]
+
+  - name: int_missing_trades
+    description: "Trades that exist on one side only"
+    config:
+      tags: ["intermediate", "daily"]
+    columns:
+      - name: trade_id
+        description: "Unique trade identifier"
+        tests: [not_null]
+      - name: break_type
+        description: "MISSING_FROM_EXCHANGE or MISSING_FROM_BROKER"
+        tests:
+          - not_null
+          - accepted_values:
+              config:
+                severity: error
+              values: ["MISSING_FROM_EXCHANGE", "MISSING_FROM_BROKER"]
+      - name: priority
+        description: "Always HIGH — missing trades require immediate attention"
+        tests:
+          - accepted_values:
+              config:
+                severity: error
+              values: ["HIGH"]

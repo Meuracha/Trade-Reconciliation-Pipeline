@@ -1,0 +1,76 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "dbt/**"
+      - "simulator/**"
+      - "dashboard/**"
+
+jobs:
+  dbt-compile:
+    name: dbt compile + sqlfluff
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install dbt-core dbt-postgres sqlfluff sqlfluff-templater-dbt
+
+      - name: dbt deps
+        working-directory: dbt
+        # compile doesn't need real DB — use dummy env vars
+        env:
+          APP_DB_HOST: localhost
+          APP_DB_PORT: "5432"
+          APP_DB_NAME: recon
+          APP_DB_USER: recon
+          APP_DB_PASSWORD: dummy
+        run: dbt deps
+
+      - name: dbt compile (syntax check)
+        working-directory: dbt
+        env:
+          APP_DB_HOST: localhost
+          APP_DB_PORT: "5432"
+          APP_DB_NAME: recon
+          APP_DB_USER: recon
+          APP_DB_PASSWORD: dummy
+        run: dbt compile
+
+      - name: sqlfluff lint
+        working-directory: dbt
+        run: |
+          sqlfluff lint models/ \
+            --dialect postgres \
+            --templater dbt \
+            --exclude-rules L016,L034
+        continue-on-error: true   # warn only, don't fail PR
+
+  python-lint:
+    name: Python lint (ruff)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: ruff check
+        run: ruff check simulator/ dashboard/
+        continue-on-error: true   # warn only, don't fail PR
