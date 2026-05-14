@@ -1,0 +1,116 @@
+name: Deploy dbt Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dbt/**"
+      - ".github/workflows/dbt_docs.yml"
+
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Generate and deploy dbt docs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: ${{ secrets.APP_DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.APP_DB_NAME }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dbt + psycopg2
+        run: pip install dbt-core dbt-postgres psycopg2-binary
+
+      - name: Init DB schema
+        env:
+          PGPASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+        run: |
+          psql -h localhost \
+               -U ${{ secrets.APP_DB_USER }} \
+               -d ${{ secrets.APP_DB_NAME }} \
+               -f postgres/init.sql
+
+      - name: Seed simulator data
+        working-directory: simulator
+        env:
+          APP_DB_HOST: localhost
+          APP_DB_PORT: "5432"
+          APP_DB_NAME: ${{ secrets.APP_DB_NAME }}
+          APP_DB_USER: ${{ secrets.APP_DB_USER }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+          ERROR_RATE: "0.01"
+          TRADES_PER_RUN: "200"
+        run: python generate_trades.py
+
+      - name: dbt deps
+        working-directory: dbt
+        env:
+          APP_DB_HOST: localhost
+          APP_DB_PORT: "5432"
+          APP_DB_NAME: ${{ secrets.APP_DB_NAME }}
+          APP_DB_USER: ${{ secrets.APP_DB_USER }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+        run: dbt deps
+
+      - name: dbt run
+        working-directory: dbt
+        env:
+          APP_DB_HOST: localhost
+          APP_DB_PORT: "5432"
+          APP_DB_NAME: ${{ secrets.APP_DB_NAME }}
+          APP_DB_USER: ${{ secrets.APP_DB_USER }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+        run: dbt run
+
+      - name: dbt docs generate
+        working-directory: dbt
+        env:
+          APP_DB_HOST: localhost
+          APP_DB_PORT: "5432"
+          APP_DB_NAME: ${{ secrets.APP_DB_NAME }}
+          APP_DB_USER: ${{ secrets.APP_DB_USER }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+        run: dbt docs generate
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dbt/target
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
